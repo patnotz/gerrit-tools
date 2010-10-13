@@ -1,17 +1,15 @@
 #!/usr/bin/env python
-from subprocess import check_output
+import argparse
+import subprocess
 import json
 try:
     from cStringIO import StringIO
 except:
     from StringIO import StringIO
 
-GerritHost = "sierra-trac.sandia.gov"
-GerritPort = "5915"
-
 def gerrit_json(cmd):
-    gcmd = ["ssh","-p",GerritPort,GerritHost,cmd]
-    json_txt = StringIO(check_output(gcmd))
+    gcmd = ["ssh","-p",GerritPort,GerritServer,cmd]
+    json_txt = StringIO(subprocess.check_output(gcmd))
     result = []
     for line in json_txt.readlines():
         blob = json.loads(line.strip())
@@ -58,32 +56,43 @@ def number_of_participants():
     rows = gerrit_gsql(sql)
     return len(rows)
     
-data = gerrit_query("project:code")
-
-owners = {}
-for blob in data:
-    changeId = blob['id']
-    status = blob['status']
-    subject = blob['subject']
-    owner = blob['owner']['name'].split()[0]
-    patchSets = blob.get('patchSets',[])
-    numPatchSets = len(patchSets)
-    numApprovals = len(blob['currentPatchSet'].get('approvals',[]))
-    for patchSet in patchSets:
-        numApprovals += len(patchSet.get('approvals',[]))
-    owners[owner] = True
-    truncatedSubject = subject[:min(40,len(subject))]
-    if truncatedSubject != subject:
-        truncatedSubject += "..."
-    print '%s - %s (%s...): %s' % (owner,truncatedSubject,changeId[:8],status)
-    #print '%s... by %s (%s): %s' % (changeId[:8],owner,status,truncatedSubject)
-    #print '\tNumber of approvals: %d' % numApprovals
-    #print '\tNumber of patch sets: %d' % numPatchSets
+if __name__ == "__main__":
     
-owners = owners.keys()
-print "Number of review submitters: %d" % len(owners)
-print "Number of review submitters: %d" % number_of_submitters()
-print "Number of reviers: %d" % number_of_reviewers()
-print "Number of commenters: %d" % number_of_commenters()
-print "Number of readers: %d" % number_of_readers()
-print "Number of participants: %d" % number_of_participants()
+    parser = argparse.ArgumentParser(description='Probe Gerrit.')
+    parser.add_argument('-s','--server',metavar='SERVER',default='sierra-trac.sandia.gov',help='Gerrit server name')
+    parser.add_argument('-p','--port',metavar='PORT',type=int,default=5915,help='Gerrit SSH port')
+
+    args = parser.parse_args()
+
+    GerritPort = '%s' % args.port
+    GerritServer = args.server
+
+    data = gerrit_query("project:code")
+
+    owners = {}
+    for blob in data:
+        changeId = blob['id']
+        status = blob['status']
+        subject = blob['subject']
+        owner = blob['owner']['name'].split()[0]
+        patchSets = blob.get('patchSets',[])
+        numPatchSets = len(patchSets)
+        numApprovals = len(blob['currentPatchSet'].get('approvals',[]))
+        for patchSet in patchSets:
+            numApprovals += len(patchSet.get('approvals',[]))
+        owners[owner] = True
+        truncatedSubject = subject[:min(40,len(subject))]
+        if truncatedSubject != subject:
+            truncatedSubject += "..."
+        print '%s - %s (%s...): %s' % (owner,truncatedSubject,changeId[:8],status)
+        #print '%s... by %s (%s): %s' % (changeId[:8],owner,status,truncatedSubject)
+        #print '\tNumber of approvals: %d' % numApprovals
+        #print '\tNumber of patch sets: %d' % numPatchSets
+
+    owners = owners.keys()
+    print "Number of review submitters: %d" % len(owners)
+    print "Number of review submitters: %d" % number_of_submitters()
+    print "Number of reviers: %d" % number_of_reviewers()
+    print "Number of commenters: %d" % number_of_commenters()
+    print "Number of readers: %d" % number_of_readers()
+    print "Number of participants: %d" % number_of_participants()
