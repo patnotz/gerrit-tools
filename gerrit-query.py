@@ -159,11 +159,11 @@ if __name__ == "__main__":
             truncatedSubject += "..."
         print '%s - %s (%s...): %s' % (owner,truncatedSubject,changeId[:8],status)
 
-    #print "Number of review submitters: %d" % number_of_submitters(gerrit)
-    #print "Number of reviers: %d" % number_of_reviewers(gerrit)
-    #print "Number of commenters: %d" % number_of_commenters(gerrit)
-    #print "Number of readers: %d" % number_of_readers(gerrit)
-    #print "Number of participants: %d" % number_of_participants(gerrit)
+    print "Number of review submitters: %d" % number_of_submitters(gerrit)
+    print "Number of reviers: %d" % number_of_reviewers(gerrit)
+    print "Number of commenters: %d" % number_of_commenters(gerrit)
+    print "Number of readers: %d" % number_of_readers(gerrit)
+    print "Number of participants: %d" % number_of_participants(gerrit)
 
     changes = gerrit.table('changes')
     change_id_to_project = {}
@@ -187,7 +187,7 @@ if __name__ == "__main__":
         count += 1
         difflc = gerrit.get_diff_line_count(rev)
         (adds, dels) = gerrit.get_add_delete_line_count(rev)
-        print '\t%s additions, %s deletions, %s difflc ( %s )' % (adds, dels, difflc, rev)
+        print '\t%s: %s additions, %s deletions, %s difflc ( %s... )' % (id, adds, dels, difflc, rev[:8])
         if id not in args.exclude:
             sum_adds += adds
             sum_dels += dels
