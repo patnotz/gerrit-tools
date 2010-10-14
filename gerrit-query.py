@@ -67,6 +67,11 @@ class Gerrit(object):
             dels += int(d)
         return (adds, dels)
 
+    def get_diff_line_count(self, ref):
+        cmd = ["git","--git-dir=%s"%self.__repo,"difftool","--no-prompt","-x","diff --suppress-common-lines -y -w",ref,"%s^"%ref]
+        output = StringIO(subprocess.check_output(cmd).strip())
+        return len(output.readlines())
+
 class Binify(object):
 
     def __init__(self, bin_tops):
@@ -132,6 +137,7 @@ if __name__ == "__main__":
     parser.add_argument('-s','--server',metavar='SERVER',default='sierra-trac.sandia.gov',help='Gerrit server name')
     parser.add_argument('-p','--port',metavar='PORT',type=int,default=5915,help='Gerrit SSH port')
     parser.add_argument('-r','--repo',metavar='DIR',default=os.path.expanduser('~/workspace/code/.git'),help='Local repo with Gerrit changes')
+    parser.add_argument('-x','--exclude',metavar='ID',default=[],action='append',help='Skip ID in histogram')
     args = parser.parse_args()
 
     gerrit = Gerrit(args.server, args.port, args.repo)
@@ -167,9 +173,11 @@ if __name__ == "__main__":
         change_id_to_project[id] = project
         
     patch_sets = gerrit.table('patch_sets')
-    (sum_adds, sum_dels) = (0,0)
+    sum_adds = 0
+    sum_dels = 0
+    sum_difflc = 0
     count = 0
-    bins = Binify([10,50,100,200,400])
+    bins = Binify([10,50,100,300,200,400])
     for rec in patch_sets:
         id  = rec['change_id']
         rev = rec['revision']
@@ -177,12 +185,17 @@ if __name__ == "__main__":
         if project != 'code':
             continue
         count += 1
+        difflc = gerrit.get_diff_line_count(rev)
         (adds, dels) = gerrit.get_add_delete_line_count(rev)
-        sum_adds += adds
-        sum_dels += dels
-        bins.add(adds + dels)
+        print '\t%s additions, %s deletions, %s difflc ( %s )' % (adds, dels, difflc, rev)
+        if id not in args.exclude:
+            sum_adds += adds
+            sum_dels += dels
+            sum_difflc += difflc
+            bins.add(difflc)
     avg_adds = int( float(sum_adds) / float(count) )
     avg_dels = int( float(sum_dels) / float(count) )
-    print 'Average: %s additions, %s deletions' % (avg_adds, avg_dels)
+    avg_difflc = int( float(sum_difflc) / float(count) )
+    print 'Average: %s additions, %s deletions, %s difflc' % (avg_adds, avg_dels, avg_difflc)
 
     bins.csv()
