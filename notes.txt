@@ -1,0 +1,253 @@
+gerrit.py:
+==========
+Q What is POSITION in PATCH_SET_ANCESTORS?
+Q Can you select across multiple tables on inner joins?
+Q How to use SQL indexes?
+Q Replicate Sierra Gerrit server to laptop?
+
+Done:
+=====
+- list open reviews
+- group reviews by topic
+
+Backlog
+=====
+3 list commits for each topic
+3 fetch/pull for each review
+3 fetch/pull for each topic
+3 make/update branches for all topics or changes
+3 Figure out ancestor stuff for (1/3, 2/3, etc.) labels
+4 Cache querey data (JSON) for off-line operation
+4 use .git/config for config defaults
+4 show/open URL for each review
+4 show/open URL for each topic
+4 sanity check against duplicate topics
+4 reduce 'select *' to only neeeded columns
+4 order SQL queries by apropriate IDs
+
+
+Salient Tables and Columns:
+===========================
+CHANGES table has CHANGE_ID, SUBJECT, TOPIC, OWNER_ACCOUNT_ID, DEST_PROJECT_NAME, DEST_BRANCH_NAME, CURRENT_PATCH_SET_ID
+PATCH_SETS table has PATCH_SET_ID, REVISION, UPLOADER_ACCOUNT_ID, CHANGE_ID
+ACCOUNTS table has ACCOUNT_ID, FULL_NAME, PREFERRED_EMAIL
+PATCH_SET_ANCESTORS table has CHANGE_ID, PATCH_SET_ID, POSITION, ANCESTOR_REVISION
+
+
+Sample Queries:
+===============
+(works) select change_id,subject,topic,dest_project_name,dest_branch_name from changes where open='Y'
+(works) select change_id,subject,topic from changes inner join patch_sets on changes.change_id=patch_sets.change_id
+(works) select change_id, revision from patch_sets 
+select change_id,subject,topic from changes revision from patch_sets inner join patch_sets on changes.change_id=patch_sets.change_id
+
+
+Raw Scheme Info:
+================
+
+pknotz@s919422: (master) ~/workspace/gerrit-tools
+$ ssh -p 29418 localhost 'gerrit gsql'Welcome to Gerrit Code Review 2.1.5
+(H2 1.2.134 (2010-04-23))
+
+Type '\h' for help.  Type '\r' to clear the buffer.
+
+gerrit> \d
+                     List of relations
+ TABLE_SCHEM | TABLE_NAME                  | TABLE_TYPE
+ ------------+-----------------------------+-----------
+ PUBLIC      | ACCOUNTS                    | TABLE
+ PUBLIC      | ACCOUNT_AGREEMENTS          | TABLE
+ PUBLIC      | ACCOUNT_DIFF_PREFERENCES    | TABLE
+ PUBLIC      | ACCOUNT_EXTERNAL_IDS        | TABLE
+ PUBLIC      | ACCOUNT_GROUPS              | TABLE
+ PUBLIC      | ACCOUNT_GROUP_AGREEMENTS    | TABLE
+ PUBLIC      | ACCOUNT_GROUP_MEMBERS       | TABLE
+ PUBLIC      | ACCOUNT_GROUP_MEMBERS_AUDIT | TABLE
+ PUBLIC      | ACCOUNT_GROUP_NAMES         | TABLE
+ PUBLIC      | ACCOUNT_PATCH_REVIEWS       | TABLE
+ PUBLIC      | ACCOUNT_PROJECT_WATCHES     | TABLE
+ PUBLIC      | ACCOUNT_SSH_KEYS            | TABLE
+ PUBLIC      | APPROVAL_CATEGORIES         | TABLE
+ PUBLIC      | APPROVAL_CATEGORY_VALUES    | TABLE
+ PUBLIC      | CHANGES                     | TABLE
+ PUBLIC      | CHANGE_MESSAGES             | TABLE
+ PUBLIC      | CONTRIBUTOR_AGREEMENTS      | TABLE
+ PUBLIC      | PATCH_COMMENTS              | TABLE
+ PUBLIC      | PATCH_SETS                  | TABLE
+ PUBLIC      | PATCH_SET_ANCESTORS         | TABLE
+ PUBLIC      | PATCH_SET_APPROVALS         | TABLE
+ PUBLIC      | PROJECTS                    | TABLE
+ PUBLIC      | REF_RIGHTS                  | TABLE
+ PUBLIC      | SCHEMA_VERSION              | TABLE
+ PUBLIC      | STARRED_CHANGES             | TABLE
+ PUBLIC      | SYSTEM_CONFIG               | TABLE
+ PUBLIC      | TRACKING_IDS                | TABLE
+
+gerrit> \d changes    
+                     Table CHANGES
+ COLUMN_NAME          | TYPE
+ ---------------------+---------------------------------
+ CHANGE_KEY           | VARCHAR(60) DEFAULT '' NOT NULL
+ CREATED_ON           | TIMESTAMP NOT NULL
+ LAST_UPDATED_ON      | TIMESTAMP NOT NULL
+ SORT_KEY             | VARCHAR(16) DEFAULT '' NOT NULL
+ OWNER_ACCOUNT_ID     | INTEGER DEFAULT 0 NOT NULL
+ DEST_PROJECT_NAME    | VARCHAR(255) DEFAULT '' NOT NULL
+ DEST_BRANCH_NAME     | VARCHAR(255) DEFAULT '' NOT NULL
+ OPEN                 | CHAR(1) DEFAULT 'N' NOT NULL
+ STATUS               | CHAR(1) DEFAULT ' ' NOT NULL
+ NBR_PATCH_SETS       | INTEGER DEFAULT 0 NOT NULL
+ CURRENT_PATCH_SET_ID | INTEGER DEFAULT 0 NOT NULL
+ SUBJECT              | VARCHAR(255) DEFAULT '' NOT NULL
+ TOPIC                | VARCHAR(255)
+ ROW_VERSION          | INTEGER DEFAULT 0 NOT NULL
+ CHANGE_ID            | INTEGER DEFAULT 0 NOT NULL
+
+Indexes on CHANGES:
+  CHANGES_ALLCLOSED (OPEN, STATUS, SORT_KEY)
+  CHANGES_ALLOPEN (OPEN, SORT_KEY)
+  CHANGES_BYOWNERCLOSED (OPEN, OWNER_ACCOUNT_ID, LAST_UPDATED_ON)
+  CHANGES_BYOWNEROPEN (OPEN, OWNER_ACCOUNT_ID, CREATED_ON, CHANGE_ID)
+  CHANGES_BYPROJECT (DEST_PROJECT_NAME)
+  CHANGES_BYPROJECTOPEN (OPEN, DEST_PROJECT_NAME, SORT_KEY)
+  CHANGES_KEY (CHANGE_KEY)
+  CHANGES_SUBMITTED (STATUS, DEST_PROJECT_NAME, DEST_BRANCH_NAME, LAST_UPDATED_ON)
+  PRIMARY_KEY_5 UNIQUE (CHANGE_ID)
+
+gerrit> \d patch_sets
+                     Table PATCH_SETS
+ COLUMN_NAME         | TYPE
+ --------------------+---------------------------
+ REVISION            | VARCHAR(40)
+ UPLOADER_ACCOUNT_ID | INTEGER DEFAULT 0 NOT NULL
+ CREATED_ON          | TIMESTAMP NOT NULL
+ CHANGE_ID           | INTEGER DEFAULT 0 NOT NULL
+ PATCH_SET_ID        | INTEGER DEFAULT 0 NOT NULL
+
+Indexes on PATCH_SETS:
+  PRIMARY_KEY_6AB UNIQUE (CHANGE_ID, PATCH_SET_ID)
+
+gerrit> \d projects 
+                     Table PROJECTS
+ COLUMN_NAME                | TYPE
+ ---------------------------+---------------------------------
+ DESCRIPTION                | CLOB
+ USE_CONTRIBUTOR_AGREEMENTS | CHAR(1) DEFAULT 'N' NOT NULL
+ USE_SIGNED_OFF_BY          | CHAR(1) DEFAULT 'N' NOT NULL
+ SUBMIT_TYPE                | CHAR(1) DEFAULT ' ' NOT NULL
+ PARENT_NAME                | VARCHAR(255)
+ NAME                       | VARCHAR(255) DEFAULT '' NOT NULL
+
+Indexes on PROJECTS:
+  PRIMARY_KEY_F UNIQUE (NAME)
+
+gerrit> \d accounts
+                     Table ACCOUNTS
+ COLUMN_NAME         | TYPE
+ --------------------+-----------------------------
+ REGISTERED_ON       | TIMESTAMP NOT NULL
+ FULL_NAME           | VARCHAR(255)
+ PREFERRED_EMAIL     | VARCHAR(255)
+ CONTACT_FILED_ON    | TIMESTAMP
+ MAXIMUM_PAGE_SIZE   | SMALLINT DEFAULT 0 NOT NULL
+ SHOW_SITE_HEADER    | CHAR(1) DEFAULT 'N' NOT NULL
+ USE_FLASH_CLIPBOARD | CHAR(1) DEFAULT 'N' NOT NULL
+ DOWNLOAD_URL        | VARCHAR(20)
+ DOWNLOAD_COMMAND    | VARCHAR(20)
+ COPY_SELF_ON_EMAIL  | CHAR(1) DEFAULT 'N' NOT NULL
+ ACCOUNT_ID          | INTEGER DEFAULT 0 NOT NULL
+
+Indexes on ACCOUNTS:
+  ACCOUNTS_BYFULLNAME (FULL_NAME)
+  ACCOUNTS_BYPREFERREDEMAIL (PREFERRED_EMAIL)
+  PRIMARY_KEY_A UNIQUE (ACCOUNT_ID)
+
+gerrit> \d patch_set_ancestors
+                     Table PATCH_SET_ANCESTORS
+ COLUMN_NAME       | TYPE
+ ------------------+--------------------------------
+ ANCESTOR_REVISION | VARCHAR(40) DEFAULT '' NOT NULL
+ CHANGE_ID         | INTEGER DEFAULT 0 NOT NULL
+ PATCH_SET_ID      | INTEGER DEFAULT 0 NOT NULL
+ POSITION          | INTEGER DEFAULT 0 NOT NULL
+
+Indexes on PATCH_SET_ANCESTORS:
+  PATCH_SET_ANCESTORS_DESC (ANCESTOR_REVISION)
+  PRIMARY_KEY_4 UNIQUE (CHANGE_ID, PATCH_SET_ID, POSITION)
+
+gerrit> \d patch_set_approvals
+                     Table PATCH_SET_APPROVALS
+ COLUMN_NAME     | TYPE
+ ----------------+-------------------------------
+ VALUE           | SMALLINT DEFAULT 0 NOT NULL
+ GRANTED         | TIMESTAMP NOT NULL
+ CHANGE_OPEN     | CHAR(1) DEFAULT 'N' NOT NULL
+ CHANGE_SORT_KEY | VARCHAR(16)
+ CHANGE_ID       | INTEGER DEFAULT 0 NOT NULL
+ PATCH_SET_ID    | INTEGER DEFAULT 0 NOT NULL
+ ACCOUNT_ID      | INTEGER DEFAULT 0 NOT NULL
+ CATEGORY_ID     | VARCHAR(4) DEFAULT '' NOT NULL
+
+Indexes on PATCH_SET_APPROVALS:
+  PATCH_SET_APPROVALS_CLOSEDBYUSER (CHANGE_OPEN, ACCOUNT_ID, CHANGE_SORT_KEY)
+  PATCH_SET_APPROVALS_OPENBYUSER (CHANGE_OPEN, ACCOUNT_ID)
+  PRIMARY_KEY_E3 UNIQUE (CHANGE_ID, PATCH_SET_ID, ACCOUNT_ID, CATEGORY_ID)
+
+gerrit> \d system_config
+                     Table SYSTEM_CONFIG
+ COLUMN_NAME                | TYPE
+ ---------------------------+---------------------------------
+ REGISTER_EMAIL_PRIVATE_KEY | VARCHAR(36) DEFAULT '' NOT NULL
+ SITE_PATH                  | VARCHAR(255)
+ ADMIN_GROUP_ID             | INTEGER DEFAULT 0 NOT NULL
+ ANONYMOUS_GROUP_ID         | INTEGER DEFAULT 0 NOT NULL
+ REGISTERED_GROUP_ID        | INTEGER DEFAULT 0 NOT NULL
+ WILD_PROJECT_NAME          | VARCHAR(255) DEFAULT '' NOT NULL
+ BATCH_USERS_GROUP_ID       | INTEGER DEFAULT 0 NOT NULL
+ SINGLETON                  | VARCHAR(1) DEFAULT '' NOT NULL
+
+Indexes on SYSTEM_CONFIG:
+  PRIMARY_KEY_B UNIQUE (SINGLETON)
+
+gerrit> \d schema_version
+                     Table SCHEMA_VERSION
+ COLUMN_NAME | TYPE
+ ------------+-------------------------------
+ VERSION_NBR | INTEGER DEFAULT 0 NOT NULL
+ SINGLETON   | VARCHAR(1) DEFAULT '' NOT NULL
+
+Indexes on SCHEMA_VERSION:
+  PRIMARY_KEY_D UNIQUE (SINGLETON)
+
+gerrit> \d change_messages
+                     Table CHANGE_MESSAGES
+ COLUMN_NAME | TYPE
+ ------------+--------------------------------
+ AUTHOR_ID   | INTEGER
+ WRITTEN_ON  | TIMESTAMP NOT NULL
+ MESSAGE     | CLOB
+ CHANGE_ID   | INTEGER DEFAULT 0 NOT NULL
+ UUID        | VARCHAR(40) DEFAULT '' NOT NULL
+
+Indexes on CHANGE_MESSAGES:
+  PRIMARY_KEY_2D UNIQUE (CHANGE_ID, UUID)
+
+gerrit> \d patch_comments
+                     Table PATCH_COMMENTS
+ COLUMN_NAME  | TYPE
+ -------------+---------------------------------
+ LINE_NBR     | INTEGER DEFAULT 0 NOT NULL
+ AUTHOR_ID    | INTEGER DEFAULT 0 NOT NULL
+ WRITTEN_ON   | TIMESTAMP NOT NULL
+ STATUS       | CHAR(1) DEFAULT ' ' NOT NULL
+ SIDE         | SMALLINT DEFAULT 0 NOT NULL
+ MESSAGE      | CLOB
+ PARENT_UUID  | VARCHAR(40)
+ CHANGE_ID    | INTEGER DEFAULT 0 NOT NULL
+ PATCH_SET_ID | INTEGER DEFAULT 0 NOT NULL
+ FILE_NAME    | VARCHAR(255) DEFAULT '' NOT NULL
+ UUID         | VARCHAR(40) DEFAULT '' NOT NULL
+
+Indexes on PATCH_COMMENTS:
+  PATCH_COMMENT_DRAFTS (STATUS, AUTHOR_ID)
+  PRIMARY_KEY_67 UNIQUE (CHANGE_ID, PATCH_SET_ID, FILE_NAME, UUID)
