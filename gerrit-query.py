@@ -130,6 +130,31 @@ def number_of_participants(gerrit):
     sql = '%s UNION %s UNION %s order by full_name' % (sql1,sql2,sql3)
     rows = gerrit.gsql(sql)
     return len(rows)
+
+def feedback_count(gerrit, change_id):
+    changes = gerrit.table("changes")
+    abandoned = False
+    for rec in changes:
+        id = rec['change_id']
+        if id != change_id: continue
+        status = rec.get('status','')
+        if status == 'A':
+            abandoned = True
+
+    count = 0
+    change_messages = gerrit.table("change_messages")
+    for rec in change_messages:
+        id = rec['change_id']
+        if id == change_id:
+            count += 1
+    patch_comments = gerrit.table("patch_comments")
+    for rec in patch_comments:
+        id = rec['change_id']
+        if id == change_id:
+            count += 1
+    if count == 1 and abandoned:
+        count = 0
+    return count
     
 if __name__ == "__main__":
     
@@ -180,6 +205,10 @@ if __name__ == "__main__":
     bins = Binify([10,50,100,300,200,400])
     for rec in patch_sets:
         id  = rec['change_id']
+        fc  = feedback_count(gerrit, id)
+        if fc == 0:
+            print "Auto-skipping change %s" % id
+            continue
         rev = rec['revision']
         project = change_id_to_project[id]
         if project != 'code':
