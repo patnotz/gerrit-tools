@@ -203,6 +203,7 @@ if __name__ == "__main__":
     sum_difflc = 0
     count = 0
     bins = Binify([10,50,100,300,200,400])
+    ids = {}
     for rec in patch_sets:
         id  = rec['change_id']
         fc  = feedback_count(gerrit, id)
@@ -213,11 +214,12 @@ if __name__ == "__main__":
         project = change_id_to_project[id]
         if project != 'code':
             continue
-        count += 1
         difflc = gerrit.get_diff_line_count(rev)
         (adds, dels) = gerrit.get_add_delete_line_count(rev)
         print '\t%s: %s additions, %s deletions, %s difflc ( %s... )' % (id, adds, dels, difflc, rev[:8])
         if id not in args.exclude:
+            count += 1
+            ids[id] = True
             sum_adds += adds
             sum_dels += dels
             sum_difflc += difflc
@@ -225,6 +227,8 @@ if __name__ == "__main__":
     avg_adds = int( float(sum_adds) / float(count) )
     avg_dels = int( float(sum_dels) / float(count) )
     avg_difflc = int( float(sum_difflc) / float(count) )
+    print "%d Changes Reviewed" % len(ids.keys())
+    print "%d Reviewed Patches" % count
     print 'Average: %s additions, %s deletions, %s difflc' % (avg_adds, avg_dels, avg_difflc)
 
     bins.csv()
